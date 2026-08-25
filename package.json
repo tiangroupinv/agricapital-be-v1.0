@@ -1,0 +1,41 @@
+{
+  "name": "agricapital-be-v1.0",
+  "version": "1.0.0",
+  "description": "Product Requirements Document (PRD) AgriCapital Rwanda — Web Platform (MVP)",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tiangroupinv/agricapital-be-v1.0.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/tiangroupinv/agricapital-be-v1.0/issues"
+  },
+  "homepage": "https://github.com/tiangroupinv/agricapital-be-v1.0#readme",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "helmet": "^8.3.0",
+    "mongoose": "^9.9.3"
+  },
+  "devDependencies": {
+    "jest": "^30.4.2",
+    "mongodb-memory-server": "^11.2.0",
+    "nodemon": "^3.1.14",
+    "supertest": "^7.2.2"
+  },
+ "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "test": "jest --detectOpenHandles"
+  }
+}
