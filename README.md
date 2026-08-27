@@ -1,7 +1,71 @@
-Product Requirements Document (PRD)
-AgriCapital Rwanda — Web Platform (MVP)
+# AgriCapital Rwanda — Backend API
 
-Founder: Joana Uwamahoro Document owner: AgriCapital Rwanda Status: Draft v1.0 Target MVP Launch: October 19, 2026 Audience: Engineering team (in-house or outsourced), investors / technical due diligence reviewers
+> **Quick Start**: See [Database Setup Guide](./docs/DATABASE_SETUP.md) for environment configuration.
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| Runtime | Node.js (vanilla JavaScript) |
+| Framework | Express.js |
+| Database | MongoDB + Mongoose |
+| Testing | Jest + mongodb-memory-server |
+
+## Getting Started
+
+```bash
+# Install dependencies
+npm install
+
+# Copy environment file
+cp .env.example .env
+
+# Configure your .env with MONGODB_URI
+
+# Start development server
+npm run dev
+
+# Run tests
+npm test
+```
+
+## Documentation
+
+- [Database Setup Guide](./docs/DATABASE_SETUP.md) — How to configure MongoDB
+- [Database Design & Workflow](./docs/AgriCapital_DB_Design_and_Workflow.md) — Schema design and validation rules
+- [Implementation Tasks](./docs/MVP_IMPLEMENTATION_TASKS.md) — Task tracking for MVP
+- [AGENTS.md](./AGENTS.md) — AI agent instructions and coding conventions
+
+## Project Structure
+
+```
+src/
+├── server.js           # Entry point
+├── app.js              # Express app setup
+├── config/             # Environment configuration
+├── constants/          # Enums and constants
+├── database/           # Connection and validators
+│   └── validators/     # MongoDB schema validators
+├── middleware/         # Auth, error handling, etc.
+├── modules/            # Domain modules
+│   ├── users/
+│   ├── cycles/
+│   ├── investments/
+│   ├── disbursements/
+│   ├── progressUpdates/
+│   ├── payouts/
+│   ├── auditLogs/
+│   └── notifications/
+└── utils/              # Helper functions
+```
+
+---
+
+# Product Requirements Document (PRD)
+
+**AgriCapital Rwanda — Web Platform (MVP)**
+
+Founder: Joana Uwamahoro | Document owner: AgriCapital Rwanda | Status: Draft v1.0 | Target MVP Launch: October 19, 2026
 
 1. Overview
 
