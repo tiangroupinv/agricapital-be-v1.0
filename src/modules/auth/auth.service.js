@@ -4,12 +4,30 @@ const { signToken } = require("../../utils/jwt");
 const ApiError = require("../../utils/apiError");
 const { ROLES } = require("../../constants");
 
+// Required fields for signup
+const REQUIRED_FIELDS = ["role", "fullName", "email", "phone", "password", "idDocumentNumber"];
+
+/**
+ * Validate required fields
+ * @param {Object} data - Data to validate
+ * @throws {ApiError} If required field is missing
+ */
+function validateRequiredFields(data) {
+  const missing = REQUIRED_FIELDS.filter((field) => !data[field]);
+  if (missing.length > 0) {
+    throw new ApiError(400, `Missing required fields: ${missing.join(", ")}`);
+  }
+}
+
 /**
  * Register a new user
  * @param {Object} userData - User registration data
  * @returns {Promise<Object>} Created user and token
  */
 async function signup(userData) {
+  // Validate required fields
+  validateRequiredFields(userData);
+
   const { role, fullName, email, phone, password, idDocumentNumber, farmerProfile } = userData;
 
   // Check if user already exists
@@ -62,6 +80,11 @@ async function signup(userData) {
  * @returns {Promise<Object>} User and token
  */
 async function login(email, password) {
+  // Validate inputs
+  if (!email || !password) {
+    throw new ApiError(400, "Email and password are required");
+  }
+
   // Find user and include passwordHash
   const user = await User.findOne({ email }).select("+passwordHash");
 
