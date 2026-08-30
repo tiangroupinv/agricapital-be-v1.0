@@ -41,7 +41,8 @@ cp .env.example .env
 | `NODE_ENV` | Environment mode | `development` or `production` |
 | `PORT` | Server port | `5000` |
 | `MONGODB_URI` | MongoDB connection string | `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/agricapital_dev` |
-| `JWT_SECRET` | Secret for JWT tokens | `your-secure-secret-here` |
+| `JWT_SECRET` | Secret for signing JWT tokens | `your-secure-secret-here` |
+| `JWT_EXPIRES_IN` | JWT token expiration time | `7d` or `24h` or `604800` (seconds) |
 
 ### Example `.env` File
 
@@ -49,7 +50,8 @@ cp .env.example .env
 NODE_ENV=development
 PORT=5000
 MONGODB_URI=mongodb+srv://username:password@cluster0.mongodb.net/agricapital_dev
-JWT_SECRET=your-jwt-secret-here
+JWT_SECRET=your-super-secret-jwt-key-change-in-production
+JWT_EXPIRES_IN=7d
 ```
 
 ---
