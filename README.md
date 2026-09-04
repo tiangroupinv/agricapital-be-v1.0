@@ -33,9 +33,17 @@ npm test
 
 - [Database Setup Guide](./docs/DATABASE_SETUP.md) — How to configure MongoDB
 - [Authentication API](./docs/AUTHENTICATION.md) — Auth endpoints and RBAC
+- [Cycle Management API](./docs/CYCLE_MANAGEMENT_API.md) — Cycle endpoints and workflow
 - [Database Design & Workflow](./docs/AgriCapital_DB_Design_and_Workflow.md) — Schema design and validation rules
 - [Implementation Tasks](./docs/MVP_IMPLEMENTATION_TASKS.md) — Task tracking for MVP
 - [AGENTS.md](./AGENTS.md) — AI agent instructions and coding conventions
+
+## API Documentation
+
+Interactive API documentation available at:
+
+- Swagger UI: `http://localhost:5000/api/docs`
+- OpenAPI JSON: `http://localhost:5000/api/docs.json`
 
 ## Project Structure
 
@@ -43,6 +51,8 @@ npm test
 src/
 ├── server.js           # Entry point
 ├── app.js              # Express app setup
+├── config/             # Configuration files
+│   └── swagger.js      # OpenAPI/Swagger configuration
 ├── constants/          # Enums and constants
 ├── database/           # Connection and validators
 │   └── validators/     # MongoDB schema validators
@@ -54,7 +64,10 @@ src/
 │   │   ├── auth.controller.js
 │   │   └── auth.routes.js
 │   ├── users/          # User management
-│   ├── cycles/
+│   ├── cycles/         # Cycle management (✅ implemented)
+│   │   ├── cycles.service.js
+│   │   ├── cycles.controller.js
+│   │   └── cycles.routes.js
 │   ├── investments/
 │   ├── disbursements/
 │   ├── progressUpdates/
