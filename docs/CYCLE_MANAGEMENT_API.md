@@ -9,9 +9,22 @@ This document describes the cycle management endpoints and workflow for the Agri
 1. [Overview](#overview)
 2. [Status Workflow](#status-workflow)
 3. [API Endpoints](#api-endpoints)
+   - [Create Cycle](#create-cycle)
+   - [List Cycles](#list-cycles)
+   - [Get Cycle](#get-cycle)
+   - [Update Cycle](#update-cycle)
+   - [Set Off-Taker Agreement](#set-off-taker-agreement)
+   - [Submit for Review](#submit-for-review)
+   - [Approve Cycle](#approve-cycle)
+   - [Reject Cycle](#reject-cycle)
+   - [Publish for Funding](#publish-for-funding)
+   - [Cancel Cycle](#cancel-cycle)
+   - [Complete Cycle](#complete-cycle)
 4. [Authorization Matrix](#authorization-matrix)
 5. [Validation Rules](#validation-rules)
 6. [Usage Examples](#usage-examples)
+7. [Error Responses](#error-responses)
+8. [Related Documentation](#related-documentation)
 
 ---
 
@@ -407,6 +420,100 @@ Mark a cycle as completed with final sale amount.
 
 ---
 
+### Set Off-Taker Agreement
+
+**PUT** `/api/cycles/:id/off-taker-agreement`
+
+Set or update the off-taker agreement for a cycle. This agreement is required before a cycle can be approved.
+
+**Access:** Admin only
+
+**Request Body:**
+
+```json
+{
+  "buyerName": "Rwanda Trading Company",
+  "buyerType": "exporter",
+  "product": "Maize",
+  "pricePerUnit": 350,
+  "quantity": 1000,
+  "contractReference": "RTC-2024-001",
+  "contractDocumentUrl": "https://example.com/contracts/RTC-2024-001.pdf"
+}
+```
+
+**Field Definitions:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `buyerName` | string | Yes | Name of the buying company/individual |
+| `buyerType` | string | Yes | One of: `hotel`, `school`, `factory`, `exporter`, `supermarket`, `other` |
+| `product` | string | Yes | Product being sold |
+| `pricePerUnit` | number | No | Price per unit in RWF (must be ≥ 0) |
+| `quantity` | number | No | Quantity agreed (must be ≥ 0) |
+| `contractReference` | string | No | Contract reference number |
+| `contractDocumentUrl` | string | No | URL to the signed contract document |
+
+**Response (200 OK):**
+
+```json
+{
+  "status": "success",
+  "message": "Off-taker agreement updated",
+  "data": {
+    "_id": "6789abcdef...",
+    "offTakerAgreement": {
+      "buyerName": "Rwanda Trading Company",
+      "buyerType": "exporter",
+      "product": "Maize",
+      "pricePerUnit": 350,
+      "quantity": 1000,
+      "contractReference": "RTC-2024-001",
+      "contractDocumentUrl": "https://example.com/contracts/RTC-2024-001.pdf"
+    }
+  }
+}
+```
+
+**Error Responses:**
+
+```json
+// 400 Bad Request - Missing required field
+{
+  "status": "error",
+  "message": "buyerName is required"
+}
+
+// 400 Bad Request - Invalid buyerType
+{
+  "status": "error",
+  "message": "Invalid buyerType. Must be one of: hotel, school, factory, exporter, supermarket, other"
+}
+
+// 400 Bad Request - Negative value
+{
+  "status": "error",
+  "message": "pricePerUnit must be non-negative"
+}
+
+// 403 Forbidden
+{
+  "message": "You do not have permission to perform this action."
+}
+```
+
+**Audit Logging:**
+
+All agreement changes are logged to the `auditLogs` collection with:
+- `action`: `cycle.agreement_updated`
+- `actorId`: Admin user ID
+- `entityType`: `cycle`
+- `entityId`: Cycle ID
+- `oldValue`: Previous agreement (or null)
+- `newValue`: New agreement data
+
+---
+
 ## Authorization Matrix
 
 | Endpoint | Investor | Farmer | Field Agent | Admin |
@@ -415,6 +522,7 @@ Mark a cycle as completed with final sale amount.
 | `GET /api/cycles` | ✅ | ✅ | ✅ | ✅ |
 | `GET /api/cycles/:id` | ✅ | ✅ | ✅ | ✅ |
 | `PATCH /api/cycles/:id` | ❌ | ❌ | Owner only | ✅ |
+| `PUT /api/cycles/:id/off-taker-agreement` | ❌ | ❌ | ❌ | ✅ |
 | `POST /api/cycles/:id/submit` | ❌ | ❌ | Owner only | ❌ |
 | `POST /api/cycles/:id/approve` | ❌ | ❌ | ❌ | ✅ |
 | `POST /api/cycles/:id/reject` | ❌ | ❌ | ❌ | ✅ |
@@ -445,8 +553,16 @@ Mark a cycle as completed with final sale amount.
 | `buyerName` | Required |
 | `buyerType` | Required, one of: `hotel`, `school`, `factory`, `exporter`, `supermarket`, `other` |
 | `product` | Required |
-| `pricePerUnit` | Required, must be positive |
-| `quantity` | Required, must be positive |
+| `pricePerUnit` | Must be non-negative (≥ 0) |
+| `quantity` | Must be non-negative (≥ 0) |
+| `contractReference` | Optional string |
+| `contractDocumentUrl` | Optional string (URL format) |
+
+**Note:** Off-taker agreements can be set via:
+1. `PUT /api/cycles/:id/off-taker-agreement` — Admin only endpoint (recommended)
+2. `PATCH /api/cycles/:id` — Embedded in update (field agent, draft only)
+
+The dedicated endpoint includes audit logging and is recommended for compliance purposes.
 
 ---
 
@@ -467,18 +583,17 @@ curl -X POST http://localhost:5000/api/cycles \
     "location": "Musanze District"
   }'
 
-# 2. Field agent adds off-taker agreement via update
-curl -X PATCH http://localhost:5000/api/cycles/:id \
-  -H "Authorization: Bearer $FIELD_AGENT_TOKEN" \
+# 2. Admin sets off-taker agreement (recommended)
+curl -X PUT http://localhost:5000/api/cycles/:id/off-taker-agreement \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "offTakerAgreement": {
-      "buyerName": "Rwanda Trading Co",
-      "buyerType": "exporter",
-      "product": "Maize",
-      "pricePerUnit": 350,
-      "quantity": 1000
-    }
+    "buyerName": "Rwanda Trading Co",
+    "buyerType": "exporter",
+    "product": "Maize",
+    "pricePerUnit": 350,
+    "quantity": 1000,
+    "contractReference": "RTC-2024-001"
   }'
 
 # 3. Field agent submits for review

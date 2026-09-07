@@ -531,4 +531,101 @@ describe("Cycle Module", () => {
         .expect(400);
     });
   });
+
+  describe("PUT /api/cycles/:id/off-taker-agreement", () => {
+    let cycle;
+
+    beforeEach(async () => {
+      cycle = await Cycle.create({
+        farmerId: farmer._id,
+        fieldAgentIds: [fieldAgent._id],
+        type: "crop",
+        purpose: "seeds",
+        targetAmount: 500000,
+        location: "Musanze",
+        status: CYCLE_STATUS.DRAFT,
+      });
+    });
+
+    it("should set off-taker agreement as admin", async () => {
+      const response = await request(app)
+        .put(`/api/cycles/${cycle._id}/off-taker-agreement`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          buyerName: "Rwanda Trading Co",
+          buyerType: "exporter",
+          product: "Maize",
+          pricePerUnit: 350,
+          quantity: 1000,
+          contractReference: "RTC-2024-001",
+        })
+        .expect(200);
+
+      expect(response.body.status).toBe("success");
+      expect(response.body.data.offTakerAgreement.buyerName).toBe("Rwanda Trading Co");
+      expect(response.body.data.offTakerAgreement.buyerType).toBe("exporter");
+      expect(response.body.data.offTakerAgreement.product).toBe("Maize");
+      expect(response.body.data.offTakerAgreement.pricePerUnit).toBe(350);
+      expect(response.body.data.offTakerAgreement.quantity).toBe(1000);
+    });
+
+    it("should reject non-admin", async () => {
+      await request(app)
+        .put(`/api/cycles/${cycle._id}/off-taker-agreement`)
+        .set("Authorization", `Bearer ${fieldAgentToken}`)
+        .send({
+          buyerName: "Test",
+          buyerType: "factory",
+          product: "Rice",
+        })
+        .expect(403);
+    });
+
+    it("should require buyerName", async () => {
+      await request(app)
+        .put(`/api/cycles/${cycle._id}/off-taker-agreement`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          buyerType: "exporter",
+          product: "Maize",
+        })
+        .expect(400);
+    });
+
+    it("should require buyerType", async () => {
+      await request(app)
+        .put(`/api/cycles/${cycle._id}/off-taker-agreement`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          buyerName: "Test",
+          product: "Maize",
+        })
+        .expect(400);
+    });
+
+    it("should validate buyerType enum", async () => {
+      await request(app)
+        .put(`/api/cycles/${cycle._id}/off-taker-agreement`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          buyerName: "Test",
+          buyerType: "invalid_type",
+          product: "Maize",
+        })
+        .expect(400);
+    });
+
+    it("should reject negative pricePerUnit", async () => {
+      await request(app)
+        .put(`/api/cycles/${cycle._id}/off-taker-agreement`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          buyerName: "Test",
+          buyerType: "exporter",
+          product: "Maize",
+          pricePerUnit: -100,
+        })
+        .expect(400);
+    });
+  });
 });

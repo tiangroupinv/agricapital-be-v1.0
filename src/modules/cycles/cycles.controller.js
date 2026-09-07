@@ -195,6 +195,28 @@ async function completeCycle(req, res, next) {
   }
 }
 
+/**
+ * Set/update off-taker agreement for a cycle
+ * @route PUT /api/cycles/:id/off-taker-agreement
+ * @access Private (admin only)
+ */
+async function setOffTakerAgreement(req, res, next) {
+  try {
+    const cycle = await cyclesService.setOffTakerAgreement(
+      req.user._id,
+      req.params.id,
+      req.body
+    );
+    res.status(200).json({
+      status: "success",
+      message: "Off-taker agreement updated",
+      data: cycle,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   createCycle,
   listCycles,
@@ -206,4 +228,5 @@ module.exports = {
   publishForFunding,
   cancelCycle,
   completeCycle,
+  setOffTakerAgreement,
 };

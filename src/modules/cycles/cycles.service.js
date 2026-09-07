@@ -1,14 +1,8 @@
 const Cycle = require("./cycles.model");
 const User = require("../users/users.model");
+const AuditLog = require("../auditLogs/auditLogs.model");
 const ApiError = require("../../utils/apiError");
-const { CYCLE_STATUS, CYCLE_TRANSITIONS, ROLES } = require("../../constants");
-
-/**
- * Validate that a user exists and has the correct role
- * @param {string} userId - User ID to validate
- * @param {string} expectedRole - Expected role (optional)
- * @returns {Promise<Object>} User document
- */
+const { CYCLE_STATUS, CYCLE_TRANSITIONS, ROLES, BUYER_TYPES_LIST } = require("../../constants");
 async function validateUser(userId, expectedRole = null) {
   const user = await User.findById(userId);
   if (!user) {
@@ -472,6 +466,68 @@ async function closeCycle(cycleId) {
 }
 
 /**
+ * Set or update off-taker agreement for a cycle
+ * @param {string} userId - Admin user ID
+ * @param {string} cycleId - Cycle ID
+ * @param {Object} agreementData - Off-taker agreement data
+ * @returns {Promise<Object>} Updated cycle
+ */
+async function setOffTakerAgreement(userId, cycleId, agreementData) {
+  // Validate admin
+  await validateUser(userId, ROLES.ADMIN);
+
+  const cycle = await Cycle.findById(cycleId);
+  if (!cycle) {
+    throw new ApiError(404, "Cycle not found");
+  }
+
+  // Capture old value for audit
+  const oldValue = cycle.offTakerAgreement || null;
+
+  // Validate required fields
+  if (!agreementData.buyerName) {
+    throw new ApiError(400, "buyerName is required");
+  }
+  if (!agreementData.buyerType) {
+    throw new ApiError(400, "buyerType is required");
+  }
+  if (!agreementData.product) {
+    throw new ApiError(400, "product is required");
+  }
+
+  // Validate numeric fields
+  if (agreementData.pricePerUnit !== undefined && agreementData.pricePerUnit < 0) {
+    throw new ApiError(400, "pricePerUnit must be non-negative");
+  }
+  if (agreementData.quantity !== undefined && agreementData.quantity < 0) {
+    throw new ApiError(400, "quantity must be non-negative");
+  }
+
+  // Validate buyerType is a valid enum
+  if (!BUYER_TYPES_LIST.includes(agreementData.buyerType)) {
+    throw new ApiError(400, `Invalid buyerType. Must be one of: ${BUYER_TYPES_LIST.join(", ")}`);
+  }
+
+  const updatedCycle = await Cycle.findByIdAndUpdate(
+    cycleId,
+    { $set: { offTakerAgreement: agreementData } },
+    { new: true }
+  );
+
+  // Audit log
+  await AuditLog.create({
+    actorId: userId,
+    action: "cycle.agreement_updated",
+    entityType: "cycle",
+    entityId: cycleId,
+    oldValue: oldValue,
+    newValue: agreementData,
+  });
+
+  return updatedCycle;
+}
+
+/**
  * Get all cycles with filtering and pagination
  * @param {Object} filters - Filter criteria
  * @param {Object} pagination - Pagination options
@@ -542,4 +598,5 @@ module.exports = {
   closeCycle,
   getCycles,
   getCycleById,
+  setOffTakerAgreement,
 };

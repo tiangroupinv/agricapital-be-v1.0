@@ -493,4 +493,93 @@ router.post("/:id/cancel", authorize(ROLES.ADMIN), cyclesController.cancelCycle)
  */
 router.post("/:id/complete", authorize(ROLES.ADMIN), cyclesController.completeCycle);
 
+/**
+ * @swagger
+ * /api/cycles/{id}/off-taker-agreement:
+ *   put:
+ *     summary: Set or update off-taker agreement for a cycle
+ *     tags: [Cycles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Cycle ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - buyerName
+ *               - buyerType
+ *               - product
+ *             properties:
+ *               buyerName:
+ *                 type: string
+ *                 description: Buyer name
+ *                 example: Rwanda Trading Company
+ *               buyerType:
+ *                 type: string
+ *                 enum: [hotel, school, factory, exporter, supermarket, other]
+ *                 description: Buyer type
+ *                 example: exporter
+ *               product:
+ *                 type: string
+ *                 description: Product name
+ *                 example: Maize
+ *               pricePerUnit:
+ *                 type: number
+ *                 minimum: 0
+ *                 description: Price per unit in RWF
+ *                 example: 350
+ *               quantity:
+ *                 type: number
+ *                 minimum: 0
+ *                 description: Quantity
+ *                 example: 1000
+ *               contractReference:
+ *                 type: string
+ *                 description: Contract reference number
+ *                 example: RTC-2024-001
+ *               contractDocumentUrl:
+ *                 type: string
+ *                 format: uri
+ *                 description: URL to contract document
+ *                 example: https://example.com/contracts/RTC-2024-001.pdf
+ *     responses:
+ *       200:
+ *         description: Off-taker agreement updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: Off-taker agreement updated
+ *                 data:
+ *                   $ref: '#/components/schemas/Cycle'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Not authorized (admin only)
+ *       404:
+ *         description: Cycle not found
+ */
+router.put("/:id/off-taker-agreement", authorize(ROLES.ADMIN), cyclesController.setOffTakerAgreement);
+
 module.exports = router;
