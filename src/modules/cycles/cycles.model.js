@@ -136,6 +136,7 @@ const cycleSchema = new Schema(
     insurance: insuranceSchema,
     approvedAt: { type: Date },
     completedAt: { type: Date },
+    cancellationReason: { type: String },
   },
   { timestamps: true }
 );

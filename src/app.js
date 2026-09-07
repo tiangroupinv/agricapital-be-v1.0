@@ -2,10 +2,13 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const mongoose = require("mongoose");
+const swaggerUi = require("swagger-ui-express");
+const swaggerSpec = require("./config/swagger");
 
 // Routes
 const authRoutes = require("./modules/auth/auth.routes");
 const usersRoutes = require("./modules/users/users.routes");
+const cyclesRoutes = require("./modules/cycles/cycles.routes");
 
 const app = express();
 
@@ -14,12 +17,27 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
-// Routes
+// Health check
 app.get("/health", (req, res) => res.json({ status: "ok" }));
+
+// API Documentation
+app.use(
+  "/api/docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    customCss: ".swagger-ui .topbar { display: none }",
+    customSiteTitle: "AgriCapital API Docs",
+  })
+);
+app.get("/api/docs.json", (req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  res.send(swaggerSpec);
+});
 
 // API routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
+app.use("/api/cycles", cyclesRoutes);
 
 // 404 handler
 app.use((req, res, next) => {
