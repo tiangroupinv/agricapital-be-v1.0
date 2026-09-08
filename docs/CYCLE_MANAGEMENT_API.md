@@ -20,6 +20,7 @@ This document describes the cycle management endpoints and workflow for the Agri
    - [Publish for Funding](#publish-for-funding)
    - [Cancel Cycle](#cancel-cycle)
    - [Complete Cycle](#complete-cycle)
+   - [List Investable Cycles](#list-investable-cycles)
 4. [Authorization Matrix](#authorization-matrix)
 5. [Validation Rules](#validation-rules)
 6. [Usage Examples](#usage-examples)
@@ -514,12 +515,139 @@ All agreement changes are logged to the `auditLogs` collection with:
 
 ---
 
+### List Investable Cycles
+
+**GET** `/api/cycles/investable`
+
+List cycles available for investor discovery. Returns only cycles in investor-visible statuses with filtering, pagination, and sorting support.
+
+**Access:** Investor, Admin
+
+**Investor-Visible Statuses:** `funding`, `funded`, `in_progress`, `completed`
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `type` | string | - | Filter by cycle type: `crop`, `livestock` |
+| `purpose` | string | - | Filter by purpose: `seeds`, `feeds`, `vaccines`, `fertilizer`, `other` |
+| `minTarget` | integer | - | Minimum funding target (RWF) |
+| `maxTarget` | integer | - | Maximum funding target (RWF) |
+| `location` | string | - | Filter by location (case-insensitive partial match) |
+| `buyerType` | string | - | Filter by off-taker type: `hotel`, `school`, `factory`, `exporter`, `supermarket`, `other` |
+| `page` | integer | 1 | Page number |
+| `limit` | integer | 20 | Items per page (max 100) |
+| `sortBy` | string | `createdAt` | Sort field: `targetAmount`, `fundedAmount`, `createdAt` |
+| `sortOrder` | string | `desc` | Sort order: `asc`, `desc` |
+
+**Request Example:**
+
+```bash
+curl -X GET "http://localhost:5000/api/cycles/investable?type=crop&minTarget=100000&location=Musanze&page=1&limit=10" \
+  -H "Authorization: Bearer $INVESTOR_TOKEN"
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "cycles": [
+      {
+        "_id": "6789abcdef...",
+        "type": "crop",
+        "purpose": "seeds",
+        "targetAmount": 500000,
+        "fundedAmount": 350000,
+        "fundingProgress": 70,
+        "location": "Musanze District",
+        "expectedStartDate": "2024-03-01T00:00:00.000Z",
+        "expectedEndDate": "2024-07-31T00:00:00.000Z",
+        "status": "funding",
+        "farmerId": {
+          "_id": "123abc...",
+          "fullName": "Jean Claude Niyonzima",
+          "farmerProfile": {
+            "location": "Musanze District"
+          }
+        },
+        "offTakerAgreement": {
+          "buyerName": "Rwanda Trading Company",
+          "buyerType": "exporter",
+          "product": "Maize"
+        },
+        "insurance": true,
+        "createdAt": "2024-01-15T10:30:00.000Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "total": 25,
+      "pages": 3
+    }
+  }
+}
+```
+
+**Response Fields (Summary Data):**
+
+| Field | Description |
+|-------|-------------|
+| `type` | Cycle type (`crop`, `livestock`) |
+| `purpose` | Funding purpose |
+| `targetAmount` | Funding target in RWF |
+| `fundedAmount` | Currently funded amount |
+| `fundingProgress` | Percentage funded (0-100) |
+| `location` | Farm location |
+| `expectedStartDate` | Expected start date |
+| `expectedEndDate` | Expected end date |
+| `status` | Current status |
+| `farmerId` | Farmer summary (name, location) |
+| `offTakerAgreement` | Buyer info (buyerName, buyerType, product) |
+| `insurance` | Whether cycle has insurance |
+
+**Error Responses:**
+
+```json
+// 401 Unauthorized
+{
+  "status": "error",
+  "message": "Not authenticated"
+}
+
+// 403 Forbidden
+{
+  "message": "You do not have permission to perform this action."
+}
+```
+
+**Filter Combination Examples:**
+
+```bash
+# Crop cycles between 200k and 500k RWF
+curl -X GET "http://localhost:5000/api/cycles/investable?type=crop&minTarget=200000&maxTarget=500000" \
+  -H "Authorization: Bearer $INVESTOR_TOKEN"
+
+# Livestock cycles with exporter off-takers
+curl -X GET "http://localhost:5000/api/cycles/investable?type=livestock&buyerType=exporter" \
+  -H "Authorization: Bearer $INVESTOR_TOKEN"
+
+# Sort by target amount ascending, paginated
+curl -X GET "http://localhost:5000/api/cycles/investable?sortBy=targetAmount&sortOrder=asc&page=2&limit=20" \
+  -H "Authorization: Bearer $INVESTOR_TOKEN"
+```
+
+---
+
 ## Authorization Matrix
 
 | Endpoint | Investor | Farmer | Field Agent | Admin |
 |----------|----------|--------|-------------|-------|
 | `POST /api/cycles` | ❌ | ❌ | ✅ | ✅ |
 | `GET /api/cycles` | ✅ | ✅ | ✅ | ✅ |
+| `GET /api/cycles/investable` | ✅ | ❌ | ❌ | ✅ |
 | `GET /api/cycles/:id` | ✅ | ✅ | ✅ | ✅ |
 | `PATCH /api/cycles/:id` | ❌ | ❌ | Owner only | ✅ |
 | `PUT /api/cycles/:id/off-taker-agreement` | ❌ | ❌ | ❌ | ✅ |
@@ -642,6 +770,42 @@ const { data: cycle } = await createResponse.json();
 await fetch(`/api/cycles/${cycle._id}/submit`, {
   method: 'POST',
   headers: { 'Authorization': `Bearer ${token}` }
+});
+```
+
+### Investor Discovery
+
+```bash
+# List all investable cycles
+curl -X GET http://localhost:5000/api/cycles/investable \
+  -H "Authorization: Bearer $INVESTOR_TOKEN"
+
+# Filter by crop type in Musanze
+curl -X GET "http://localhost:5000/api/cycles/investable?type=crop&location=Musanze" \
+  -H "Authorization: Bearer $INVESTOR_TOKEN"
+
+# Find cycles with target between 200k and 500k RWF
+curl -X GET "http://localhost:5000/api/cycles/investable?minTarget=200000&maxTarget=500000" \
+  -H "Authorization: Bearer $INVESTOR_TOKEN"
+
+# Paginated results sorted by target amount
+curl -X GET "http://localhost:5000/api/cycles/investable?page=1&limit=20&sortBy=targetAmount&sortOrder=desc" \
+  -H "Authorization: Bearer $INVESTOR_TOKEN"
+```
+
+```javascript
+// Fetch investable cycles with JavaScript
+const response = await fetch(
+  '/api/cycles/investable?type=crop&minTarget=100000&location=Musanze',
+  {
+    headers: { 'Authorization': `Bearer ${investorToken}` }
+  }
+);
+
+const { data } = await response.json();
+console.log(`Found ${data.pagination.total} cycles`);
+data.cycles.forEach(cycle => {
+  console.log(`${cycle.purpose}: ${cycle.fundingProgress}% funded`);
 });
 ```
 
