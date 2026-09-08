@@ -568,6 +568,88 @@ async function getCycles(filters = {}, pagination = {}) {
 }
 
 /**
+ * Get investable cycles for investor discovery
+ * @param {Object} filters - Filter criteria
+ * @param {Object} pagination - Pagination options
+ * @param {Object} sort - Sort options
+ * @returns {Promise<Object>} Cycles and pagination info
+ */
+async function getInvestableCycles(filters = {}, pagination = {}, sort = {}) {
+  const { type, purpose, minTarget, maxTarget, location, buyerType } = filters;
+  const { page = 1, limit = 20 } = pagination;
+  const { sortBy = "createdAt", sortOrder = "desc" } = sort;
+
+  // Only show investor-visible statuses
+  const INVESTABLE_STATUSES = [
+    CYCLE_STATUS.FUNDING,
+    CYCLE_STATUS.FUNDED,
+    CYCLE_STATUS.IN_PROGRESS,
+    CYCLE_STATUS.COMPLETED,
+  ];
+
+  // Build query
+  const query = {
+    status: { $in: INVESTABLE_STATUSES },
+  };
+
+  // Apply filters
+  if (type) query.type = type;
+  if (purpose) query.purpose = purpose;
+  if (minTarget !== undefined || maxTarget !== undefined) {
+    query.targetAmount = {};
+    if (minTarget !== undefined) query.targetAmount.$gte = minTarget;
+    if (maxTarget !== undefined) query.targetAmount.$lte = maxTarget;
+  }
+  if (location) {
+    query.location = { $regex: location, $options: "i" };
+  }
+  if (buyerType) {
+    query["offTakerAgreement.buyerType"] = buyerType;
+  }
+
+  // Pagination
+  const skip = (page - 1) * limit;
+  const cappedLimit = Math.min(limit, 100);
+
+  // Sorting (stable sort with createdAt as tiebreaker)
+  const sortField = sortBy === "targetAmount" || sortBy === "fundedAmount" ? sortBy : "createdAt";
+  const sortDirection = sortOrder === "asc" ? 1 : -1;
+  const sortObj = { [sortField]: sortDirection, createdAt: -1 };
+
+  const [cycles, total] = await Promise.all([
+    Cycle.find(query)
+      .populate("farmerId", "fullName farmerProfile.location")
+      .select(
+        "type purpose targetAmount fundedAmount location expectedStartDate expectedEndDate status offTakerAgreement insurance createdAt"
+      )
+      .sort(sortObj)
+      .skip(skip)
+      .limit(cappedLimit),
+    Cycle.countDocuments(query),
+  ]);
+
+  // Add funding progress to each cycle
+  const cyclesWithProgress = cycles.map((cycle) => {
+    const cycleObj = cycle.toObject();
+    cycleObj.fundingProgress =
+      cycle.targetAmount > 0
+        ? Math.round((cycle.fundedAmount / cycle.targetAmount) * 100)
+        : 0;
+    return cycleObj;
+  });
+
+  return {
+    cycles: cyclesWithProgress,
+    pagination: {
+      page,
+      limit: cappedLimit,
+      total,
+      pages: Math.ceil(total / cappedLimit),
+    },
+  };
+}
+
+/**
  * Get cycle by ID
  * @param {string} cycleId - Cycle ID
  * @returns {Promise<Object>} Cycle document
@@ -598,5 +680,6 @@ module.exports = {
   closeCycle,
   getCycles,
   getCycleById,
+  getInvestableCycles,
   setOffTakerAgreement,
 };
