@@ -217,6 +217,53 @@ async function setOffTakerAgreement(req, res, next) {
   }
 }
 
+/**
+ * List investable cycles for investor discovery
+ * @route GET /api/cycles/investable
+ * @access Private (investor, admin)
+ */
+async function listInvestableCycles(req, res, next) {
+  try {
+    const {
+      type,
+      purpose,
+      minTarget,
+      maxTarget,
+      location,
+      buyerType,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+    } = req.query;
+
+    const filters = {};
+    if (type) filters.type = type;
+    if (purpose) filters.purpose = purpose;
+    if (minTarget !== undefined) filters.minTarget = parseInt(minTarget);
+    if (maxTarget !== undefined) filters.maxTarget = parseInt(maxTarget);
+    if (location) filters.location = location;
+    if (buyerType) filters.buyerType = buyerType;
+
+    const pagination = {};
+    if (page !== undefined) pagination.page = parseInt(page);
+    if (limit !== undefined) pagination.limit = parseInt(limit);
+
+    const sort = {};
+    if (sortBy) sort.sortBy = sortBy;
+    if (sortOrder) sort.sortOrder = sortOrder;
+
+    const result = await cyclesService.getInvestableCycles(filters, pagination, sort);
+
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   createCycle,
   listCycles,
@@ -229,4 +276,5 @@ module.exports = {
   cancelCycle,
   completeCycle,
   setOffTakerAgreement,
+  listInvestableCycles,
 };

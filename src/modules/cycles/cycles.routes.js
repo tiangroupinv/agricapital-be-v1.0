@@ -582,4 +582,100 @@ router.post("/:id/complete", authorize(ROLES.ADMIN), cyclesController.completeCy
  */
 router.put("/:id/off-taker-agreement", authorize(ROLES.ADMIN), cyclesController.setOffTakerAgreement);
 
+/**
+ * @swagger
+ * /api/cycles/investable:
+ *   get:
+ *     summary: List investable cycles for investor discovery
+ *     tags: [Cycles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [crop, livestock]
+ *         description: Filter by cycle type
+ *       - in: query
+ *         name: purpose
+ *         schema:
+ *           type: string
+ *         description: Filter by purpose
+ *       - in: query
+ *         name: minTarget
+ *         schema:
+ *           type: integer
+ *         description: Minimum funding target (RWF)
+ *       - in: query
+ *         name: maxTarget
+ *         schema:
+ *           type: integer
+ *         description: Maximum funding target (RWF)
+ *       - in: query
+ *         name: location
+ *         schema:
+ *           type: string
+ *         description: Filter by location (partial match)
+ *       - in: query
+ *         name: buyerType
+ *         schema:
+ *           $ref: '#/components/schemas/BuyerType'
+ *         description: Filter by buyer type
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Items per page (max 100)
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           default: createdAt
+ *         description: Sort field (targetAmount, fundedAmount, createdAt)
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *         description: Sort order
+ *     responses:
+ *       200:
+ *         description: List of investable cycles
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     cycles:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/InvestableCycle'
+ *                     pagination:
+ *                       $ref: '#/components/schemas/Pagination'
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Not authorized (investor or admin only)
+ */
+router.get(
+  "/investable",
+  authorize(ROLES.INVESTOR, ROLES.ADMIN),
+  cyclesController.listInvestableCycles
+);
+
 module.exports = router;
