@@ -136,10 +136,13 @@ router.get("/", cyclesController.listCycles);
  *         required: true
  *         schema:
  *           type: string
- *         description: Cycle ID
+ *           description: Cycle ID
  *     responses:
  *       200:
- *         description: Cycle details
+ *         description: Cycle details — response shape varies by user role.
+ *           Investors receive a detail view with farmer summary, funding progress from confirmed investments,
+ *           insurance status, expected returns, and a timeline; all other authenticated roles
+ *           (farmer, field_agent, admin) receive the full cycle document with populated fields.
  *         content:
  *           application/json:
  *             schema:
@@ -154,6 +157,10 @@ router.get("/", cyclesController.listCycles);
  *         description: Not authenticated
  *       404:
  *         description: Cycle not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 router.get("/:id", cyclesController.getCycle);
 

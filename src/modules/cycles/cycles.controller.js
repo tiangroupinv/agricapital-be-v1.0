@@ -48,7 +48,7 @@ async function listCycles(req, res, next) {
  */
 async function getCycle(req, res, next) {
   try {
-    const cycle = await cyclesService.getCycleById(req.params.id);
+    const cycle = await cyclesService.getCycleById(req.params.id, req.user);
     res.status(200).json({
       status: "success",
       data: cycle,

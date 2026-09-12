@@ -1,8 +1,31 @@
 const Cycle = require("./cycles.model");
 const User = require("../users/users.model");
 const AuditLog = require("../auditLogs/auditLogs.model");
+const Investment = require("../investments/investments.model");
+const ProgressUpdate = require("../progressUpdates/progressUpdates.model");
 const ApiError = require("../../utils/apiError");
-const { CYCLE_STATUS, CYCLE_TRANSITIONS, ROLES, BUYER_TYPES_LIST } = require("../../constants");
+const { PLATFORM_FEE_RATE, BROKERAGE_FEE_RATE } = require("../../config/fees");
+const {
+  CYCLE_STATUS,
+  CYCLE_TRANSITIONS,
+  ROLES,
+  BUYER_TYPES_LIST,
+  INVESTMENT_STATUS,
+  CLAIM_STATUS,
+} = require("../../constants");
+
+/**
+ * Cycle statuses visible on the investor detail page.
+ * Mirrors investor discovery (funding → completed) plus closed,
+ * which investors track while their payouts are being processed.
+ */
+const INVESTOR_VISIBLE_STATUSES = [
+  CYCLE_STATUS.FUNDING,
+  CYCLE_STATUS.FUNDED,
+  CYCLE_STATUS.IN_PROGRESS,
+  CYCLE_STATUS.COMPLETED,
+  CYCLE_STATUS.CLOSED,
+];
 async function validateUser(userId, expectedRole = null) {
   const user = await User.findById(userId);
   if (!user) {
@@ -90,6 +113,210 @@ function canApprove(cycle) {
     agreement.pricePerUnit &&
     agreement.quantity
   );
+}
+
+/**
+ * Percentage of targetAmount currently funded.
+ */
+function fundingPercent(fundedAmount, targetAmount) {
+  if (!targetAmount) return 0;
+  return Math.min(100, Math.round((fundedAmount / targetAmount) * 100));
+}
+
+/**
+ * Farmer summary for the investor cycle detail page.
+ * Deliberately excludes PII/contact fields (email, phone, idDocumentNumber, kycStatus).
+ * @param {Object} farmer - Populated farmer user document (or null)
+ * @returns {Object|null}
+ */
+function farmerSummary(farmer) {
+  if (!farmer) return null;
+  return {
+    _id: farmer._id,
+    fullName: farmer.fullName,
+    ...(farmer.farmerProfile
+      ? {
+          farmLocation: farmer.farmerProfile.location,
+          farmType: farmer.farmerProfile.farmType,
+          cooperativeName: farmer.farmerProfile.cooperativeName,
+        }
+      : {}),
+  };
+}
+
+/**
+ * Off-taker agreement summary for the investor dashboard page.
+ * Excludes the internal contract document URL.
+ * @param {Object} agreement - cycle.offTakerAgreement
+ */
+function offTakerAgreementSummary(agreement) {
+  if (!agreement) return null;
+  const { buyerName, buyerType, product, pricePerUnit, quantity, contractReference } = agreement;
+  return { buyerName, buyerType, product, pricePerUnit, quantity, contractReference };
+}
+
+/**
+ * Insurance status summary for the investor dashboard page.
+ * Exposes coverage status + active claim count, never claim details or policyReference.
+ * @param {Object} insurance - cycle.insurance
+ */
+function insuranceSummary(insurance) {
+  if (!insurance) return null;
+  const activeClaims = Array.isArray(insurance.claims)
+    ? insurance.claims.filter(
+        (claim) =>
+          claim.claimStatus !== CLAIM_STATUS.REJECTED &&
+          claim.claimStatus !== CLAIM_STATUS.PAID
+      ).length
+    : 0;
+  return {
+    naisCovered: insurance.naisCovered,
+    insurerName: insurance.insurerName,
+    coverageStartDate: insurance.coverageStartDate,
+    coverageEndDate: insurance.coverageEndDate,
+    activeClaims,
+  };
+}
+
+/**
+ * Aggregated funding totals from confirmed investments only.
+ * pending/failed/refunded investments never contribute to funding progress.
+ * @param {string} cycleId
+ * @returns {Promise<{fundedAmount: number, investorCount: number}>}
+ */
+async function confirmedFundingSummary(cycleId) {
+  const [row] = await Investment.aggregate([
+    { $match: { cycleId: cycleId, status: INVESTMENT_STATUS.CONFIRMED } },
+    {
+      $group: {
+        _id: null,
+        fundedAmount: { $sum: "$amount" },
+        investorIds: { $addToSet: "$investorId" },
+      },
+    },
+    {
+      $project: {
+        fundedAmount: 1,
+        investorCount: { $size: "$investorIds" },
+      },
+    },
+  ]);
+  if (!row) return { fundedAmount: 0, investorCount: 0 };
+  return {
+    fundedAmount: row.fundedAmount,
+    investorCount: row.investorCount,
+  };
+}
+
+/**
+ * Expected net return range for an investor in a cycle.
+ *
+ * Gross proceeds come from the off-taker agreement estimate (pricePerUnit × quantity)
+ * when the cycle is in funding/funded (pre-sale), or from finalSaleAmount once complete.
+ * Net = gross × (1 − platformFee − brokerageFee), using the fee bands from config/fees.
+ *
+ * Returns null when no proceeds basis exists.
+ * @param {Object} cycle - Cycle document
+ * @returns {Object|null} { proceedsAmount, proceedsSource, netReturnRange, fees }
+ */
+function buildExpectedReturns(cycle) {
+  let proceeds = cycle.finalSaleAmount;
+  let proceedsSource = "final_sale";
+
+  if (proceeds === null || proceeds === undefined) {
+    const { pricePerUnit, quantity } = cycle.offTakerAgreement || {};
+    if (pricePerUnit && quantity) {
+      proceeds = pricePerUnit * quantity;
+      proceedsSource = "off_taker_estimate";
+    }
+  }
+
+  if (!proceeds) return null;
+
+  const netMin = Math.round(
+    proceeds * (1 - PLATFORM_FEE_RATE.MAX - BROKERAGE_FEE_RATE.MAX)
+  );
+  const netMax = Math.round(
+    proceeds * (1 - PLATFORM_FEE_RATE.MIN - BROKERAGE_FEE_RATE.MIN)
+  );
+
+  return {
+    proceedsAmount: proceeds,
+    proceedsSource,
+    fees: {
+      platformFeeRate: { ...PLATFORM_FEE_RATE },
+      brokerageFeeRate: { ...BROKERAGE_FEE_RATE },
+    },
+    netReturnRange: { min: netMin, max: netMax },
+  };
+}
+
+/**
+ * Build the investor-facing timeline: key cycle dates plus progress updates,
+ * sorted ascending by date.
+ * @param {Object} cycle - Cycle document
+ * @param {Array} updates - progress update documents for the cycle
+ */
+function buildTimeline(cycle, updates) {
+  const events = [];
+
+  if (cycle.createdAt) {
+    events.push({ date: cycle.createdAt, type: "cycle_created", description: "Cycle created" });
+  }
+  if (cycle.approvedAt) {
+    events.push({ date: cycle.approvedAt, type: "approved", description: "Cycle approved by platform" });
+  }
+  if (cycle.completedAt) {
+    events.push({ date: cycle.completedAt, type: "completed", description: "Cycle completed" });
+  }
+
+  for (const update of updates) {
+    events.push({
+      date: update.visitDate,
+      type: "progress_update",
+      updateType: update.updateType,
+      description: update.notes,
+      photos: update.photoUrls,
+    });
+  }
+
+  return events.sort((a, b) => new Date(a.date) - new Date(b.date));
+}
+
+/**
+ * Project a cycle into the investor detail view.
+ * @param {Object} cycle - Cycle document with farmer populated
+ * @param {Object} funding - { fundedAmount, investorCount } from confirmed investments
+ * @param {Array} updates - progress update documents
+ */
+function buildInvestorDetail(cycle, funding, updates) {
+  const { fundedAmount, investorCount } = funding;
+  const cycleObj = cycle.toObject();
+
+  return {
+    _id: cycleObj._id,
+    type: cycleObj.type,
+    purpose: cycleObj.purpose,
+    status: cycleObj.status,
+    location: cycleObj.location,
+    targetAmount: cycleObj.targetAmount,
+    fundedAmount,
+    fundingProgress: {
+      fundedAmount,
+      targetAmount: cycleObj.targetAmount,
+      percent: fundingPercent(fundedAmount, cycleObj.targetAmount),
+      investorCount,
+      isFullyFunded: fundedAmount >= cycleObj.targetAmount,
+    },
+    farmer: farmerSummary(cycleObj.farmerId),
+    offTakerAgreement: offTakerAgreementSummary(cycleObj.offTakerAgreement),
+    insurance: insuranceSummary(cycleObj.insurance),
+    expectedReturns: buildExpectedReturns(cycleObj),
+    timeline: buildTimeline(cycleObj, updates),
+    expectedStartDate: cycleObj.expectedStartDate,
+    expectedEndDate: cycleObj.expectedEndDate,
+    createdAt: cycleObj.createdAt,
+  };
 }
 
 /**
@@ -650,11 +877,14 @@ async function getInvestableCycles(filters = {}, pagination = {}, sort = {}) {
 }
 
 /**
- * Get cycle by ID
+ * Get cycle by ID.
+ * Investors receive the purpose-built investor detail view; all other roles
+ * receive the full cycle document (with populated farmer and field agents).
  * @param {string} cycleId - Cycle ID
- * @returns {Promise<Object>} Cycle document
+ * @param {Object} [viewer] - { _id, role } of the authenticated user
+ * @returns {Promise<Object>} Cycle document or investor detail view
  */
-async function getCycleById(cycleId) {
+async function getCycleById(cycleId, viewer = null) {
   const cycle = await Cycle.findById(cycleId)
     .populate("farmerId", "fullName email phone farmerProfile")
     .populate("fieldAgentIds", "fullName email phone");
@@ -663,7 +893,26 @@ async function getCycleById(cycleId) {
     throw new ApiError(404, "Cycle not found");
   }
 
-  return cycle;
+  const isInvestorViewer = viewer && viewer.role === ROLES.INVESTOR;
+  if (!isInvestorViewer) {
+    return cycle;
+  }
+
+  // Investors can only see investor-visible statuses — a 404 avoids leaking
+  // the existence of internal/not-yet-published cycles.
+  if (!INVESTOR_VISIBLE_STATUSES.includes(cycle.status)) {
+    throw new ApiError(404, "Cycle not found");
+  }
+
+  const [funding, updates] = await Promise.all([
+    confirmedFundingSummary(cycleId),
+    ProgressUpdate.find({ cycleId })
+      .select("updateType notes photoUrls visitDate")
+      .sort({ visitDate: 1 })
+      .lean(),
+  ]);
+
+  return buildInvestorDetail(cycle, funding, updates);
 }
 
 module.exports = {
