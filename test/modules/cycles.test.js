@@ -628,4 +628,183 @@ describe("Cycle Module", () => {
         .expect(400);
     });
   });
+
+  describe("GET /api/cycles/:id (Investor Detail)", () => {
+    let investorToken;
+    let adminToken;
+    let farmerToken;
+    let fieldAgentToken;
+
+    beforeEach(async () => {
+      const investorHash = await hashPassword("Password123");
+      investor = await User.create({
+        role: ROLES.INVESTOR,
+        fullName: "Investor",
+        email: "investor@cycle.com",
+        phone: "+250788000098",
+        passwordHash: investorHash,
+        idDocumentNumber: "1198012345678998",
+      });
+      investorToken = signToken({ userId: investor._id, role: investor.role });
+
+      const adminHash = await hashPassword("Password123");
+      admin = await User.create({
+        role: ROLES.ADMIN,
+        fullName: "Admin Cycle",
+        email: "admin@cycle.com",
+        phone: "+250788000097",
+        passwordHash: adminHash,
+        idDocumentNumber: "1198012345678997",
+      });
+      adminToken = signToken({ userId: admin._id, role: admin.role });
+
+      const farmerHash = await hashPassword("Password123");
+      farmer = await User.create({
+        role: ROLES.FARMER,
+        fullName: "Farmer",
+        email: "farmer@cycle.com",
+        phone: "+250788000096",
+        passwordHash: farmerHash,
+        idDocumentNumber: "1198012345678996",
+        farmerProfile: { location: "Kigali", farmType: "crop" },
+      });
+      farmerToken = signToken({ userId: farmer._id, role: farmer.role });
+
+      const fieldAgentHash = await hashPassword("Password123");
+      fieldAgent = await User.create({
+        role: ROLES.FIELD_AGENT,
+        fullName: "Field Agent",
+        email: "agent@cycle.com",
+        phone: "+250788000095",
+        passwordHash: fieldAgentHash,
+        idDocumentNumber: "1198012345678995",
+      });
+      fieldAgentToken = signToken({ userId: fieldAgent._id, role: fieldAgent.role });
+
+      // Create cycles with different statuses for testing
+      await Cycle.create({
+        farmerId: farmer._id,
+        fieldAgentIds: [fieldAgent._id],
+        type: "livestock",
+        purpose: "feeds",
+        targetAmount: 2000000,
+        location: "Musanze District",
+        status: CYCLE_STATUS.FUNDING,
+        offTakerAgreement: {
+          buyerName: "Kigali Serena Hotel",
+          buyerType: "hotel",
+          product: "Fresh milk",
+          pricePerUnit: 400,
+          quantity: 5000,
+          contractReference: "AGR-OT-2026-014",
+        },
+        insurance: {
+          naisCovered: true,
+          insurerName: "SORAS Insurance",
+          coverageStartDate: "2026-11-01",
+          coverageEndDate: "2027-02-01",
+        },
+      });
+    });
+
+    it("should return investor detail view for investor-visible status", async () => {
+      const cycle = await Cycle.findOne({ status: CYCLE_STATUS.FUNDING });
+      const response = await request(app)
+        .get(`/api/cycles/${cycle._id}`)
+        .set("Authorization", `Bearer ${investorToken}`)
+        .expect(200);
+
+      expect(response.body.status).toBe("success");
+      const detail = response.body.data;
+      // Check investor detail fields
+      expect(detail.fundingProgress).toBeDefined();
+      expect(detail.fundingProgress.percent).toBeDefined();
+      expect(detail.farmer.fullName).toBeDefined();
+      expect(detail.offTakerAgreement.buyerName).toBeDefined();
+      expect(detail.insurance).toBeDefined();
+      expect(detail.insurance.activeClaims).toBeDefined();
+      expect(detail.expectedReturns).toBeDefined();
+      expect(detail.timeline).toBeDefined();
+    });
+
+    it("should return 404 for non-investor-visible status (draft)", async () => {
+      const draftCycle = await Cycle.create({
+        farmerId: farmer._id,
+        fieldAgentIds: [fieldAgent._id],
+        type: "crop",
+        purpose: "seeds",
+        targetAmount: 100000,
+        location: "Kigali",
+        status: CYCLE_STATUS.DRAFT,
+      });
+      await request(app)
+        .get(`/api/cycles/${draftCycle._id}`)
+        .set("Authorization", `Bearer ${investorToken}`)
+        .expect(404);
+    });
+
+    it("should return 404 for under_review status", async () => {
+      const reviewCycle = await Cycle.create({
+        farmerId: farmer._id,
+        fieldAgentIds: [fieldAgent._id],
+        type: "livestock",
+        purpose: "feeds",
+        targetAmount: 200000,
+        location: "Musanze",
+        status: CYCLE_STATUS.UNDER_REVIEW,
+      });
+      await request(app)
+        .get(`/api/cycles/${reviewCycle._id}`)
+        .set("Authorization", `Bearer ${investorToken}`)
+        .expect(404);
+    });
+
+    it("should return 404 for approved status", async () => {
+      const approvedCycle = await Cycle.create({
+        farmerId: farmer._id,
+        fieldAgentIds: [fieldAgent._id],
+        type: "crop",
+        purpose: "fertilizer",
+        targetAmount: 300000,
+        location: "Nyagatare",
+        status: CYCLE_STATUS.APPROVED,
+      });
+      await request(app)
+        .get(`/api/cycles/${approvedCycle._id}`)
+        .set("Authorization", `Bearer ${investorToken}`)
+        .expect(404);
+    });
+
+    it("should deny access to non-investor for investor-only fields", async () => {
+      const cycle = await Cycle.findOne({ status: CYCLE_STATUS.FUNDING });
+      // Admin should still get full document
+      await request(app)
+        .get(`/api/cycles/${cycle._id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(200);
+    });
+
+    it("should exclude sensitive fields from investor view", async () => {
+      const cycle = await Cycle.findOne({ status: CYCLE_STATUS.FUNDING });
+      const response = await request(app)
+        .get(`/api/cycles/${cycle._id}`)
+        .set("Authorization", `Bearer ${investorToken}`)
+        .expect(200);
+
+      const detail = response.body.data;
+      // Farmer should have minimal info
+      expect(detail.farmer.email).toBeUndefined();
+      expect(detail.farmer.phone).toBeUndefined();
+      expect(detail.farmer.idDocumentNumber).toBeUndefined();
+      // No fieldAgentIds
+      expect(detail.fieldAgentIds).toBeUndefined();
+      // No internal insurance details
+      expect(detail.insurance.claims).toBeUndefined();
+      expect(detail.insurance.policyReference).toBeUndefined();
+      // No contract document URL
+      expect(detail.offTakerAgreement.contractDocumentUrl).toBeUndefined();
+      // No cancellation reason
+      expect(detail.cancellationReason).toBeUndefined();
+    });
+  });
 });
