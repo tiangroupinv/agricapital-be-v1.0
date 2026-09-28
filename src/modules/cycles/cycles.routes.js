@@ -136,10 +136,13 @@ router.get("/", cyclesController.listCycles);
  *         required: true
  *         schema:
  *           type: string
- *         description: Cycle ID
+ *           description: Cycle ID
  *     responses:
  *       200:
- *         description: Cycle details
+ *         description: Cycle details — response shape varies by user role.
+ *           Investors receive a detail view with farmer summary, funding progress from confirmed investments,
+ *           insurance status, expected returns, and a timeline; all other authenticated roles
+ *           (farmer, field_agent, admin) receive the full cycle document with populated fields.
  *         content:
  *           application/json:
  *             schema:
@@ -154,6 +157,10 @@ router.get("/", cyclesController.listCycles);
  *         description: Not authenticated
  *       404:
  *         description: Cycle not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 router.get("/:id", cyclesController.getCycle);
 
@@ -492,5 +499,190 @@ router.post("/:id/cancel", authorize(ROLES.ADMIN), cyclesController.cancelCycle)
  *         description: Cycle not found
  */
 router.post("/:id/complete", authorize(ROLES.ADMIN), cyclesController.completeCycle);
+
+/**
+ * @swagger
+ * /api/cycles/{id}/off-taker-agreement:
+ *   put:
+ *     summary: Set or update off-taker agreement for a cycle
+ *     tags: [Cycles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Cycle ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - buyerName
+ *               - buyerType
+ *               - product
+ *             properties:
+ *               buyerName:
+ *                 type: string
+ *                 description: Buyer name
+ *                 example: Rwanda Trading Company
+ *               buyerType:
+ *                 type: string
+ *                 enum: [hotel, school, factory, exporter, supermarket, other]
+ *                 description: Buyer type
+ *                 example: exporter
+ *               product:
+ *                 type: string
+ *                 description: Product name
+ *                 example: Maize
+ *               pricePerUnit:
+ *                 type: number
+ *                 minimum: 0
+ *                 description: Price per unit in RWF
+ *                 example: 350
+ *               quantity:
+ *                 type: number
+ *                 minimum: 0
+ *                 description: Quantity
+ *                 example: 1000
+ *               contractReference:
+ *                 type: string
+ *                 description: Contract reference number
+ *                 example: RTC-2024-001
+ *               contractDocumentUrl:
+ *                 type: string
+ *                 format: uri
+ *                 description: URL to contract document
+ *                 example: https://example.com/contracts/RTC-2024-001.pdf
+ *     responses:
+ *       200:
+ *         description: Off-taker agreement updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: Off-taker agreement updated
+ *                 data:
+ *                   $ref: '#/components/schemas/Cycle'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Not authorized (admin only)
+ *       404:
+ *         description: Cycle not found
+ */
+router.put("/:id/off-taker-agreement", authorize(ROLES.ADMIN), cyclesController.setOffTakerAgreement);
+
+/**
+ * @swagger
+ * /api/cycles/investable:
+ *   get:
+ *     summary: List investable cycles for investor discovery
+ *     tags: [Cycles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [crop, livestock]
+ *         description: Filter by cycle type
+ *       - in: query
+ *         name: purpose
+ *         schema:
+ *           type: string
+ *         description: Filter by purpose
+ *       - in: query
+ *         name: minTarget
+ *         schema:
+ *           type: integer
+ *         description: Minimum funding target (RWF)
+ *       - in: query
+ *         name: maxTarget
+ *         schema:
+ *           type: integer
+ *         description: Maximum funding target (RWF)
+ *       - in: query
+ *         name: location
+ *         schema:
+ *           type: string
+ *         description: Filter by location (partial match)
+ *       - in: query
+ *         name: buyerType
+ *         schema:
+ *           $ref: '#/components/schemas/BuyerType'
+ *         description: Filter by buyer type
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Items per page (max 100)
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           default: createdAt
+ *         description: Sort field (targetAmount, fundedAmount, createdAt)
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *         description: Sort order
+ *     responses:
+ *       200:
+ *         description: List of investable cycles
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     cycles:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/InvestableCycle'
+ *                     pagination:
+ *                       $ref: '#/components/schemas/Pagination'
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Not authorized (investor or admin only)
+ */
+router.get(
+  "/investable",
+  authorize(ROLES.INVESTOR, ROLES.ADMIN),
+  cyclesController.listInvestableCycles
+);
 
 module.exports = router;
