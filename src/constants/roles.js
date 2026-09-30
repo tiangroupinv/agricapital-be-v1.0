@@ -7,6 +7,7 @@ const ROLES = {
   FARMER: 'farmer',
   FIELD_AGENT: 'field_agent',
   ADMIN: 'admin',
+  OFF_TAKER: 'off_taker',
 };
 
 const ROLES_LIST = Object.values(ROLES);
