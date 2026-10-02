@@ -9,6 +9,7 @@ const swaggerSpec = require("./config/swagger");
 const authRoutes = require("./modules/auth/auth.routes");
 const usersRoutes = require("./modules/users/users.routes");
 const cyclesRoutes = require("./modules/cycles/cycles.routes");
+const investmentsRoutes = require("./modules/investments/investments.routes");
 
 const app = express();
 
@@ -38,6 +39,15 @@ app.get("/api/docs.json", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/cycles", cyclesRoutes);
+
+// KYC API routes
+app.use("/api/kyc", require("./modules/kyc/kyc.routes"));
+
+// Investments API routes
+app.use("/api/investments", require("./modules/investments/investments.routes"));
+
+// Investments API routes
+app.use("/api/investments", investmentsRoutes);
 
 // 404 handler
 app.use((req, res, next) => {
