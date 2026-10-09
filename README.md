@@ -34,6 +34,8 @@ npm test
 - [Database Setup Guide](./docs/DATABASE_SETUP.md) — How to configure MongoDB
 - [Authentication API](./docs/AUTHENTICATION.md) — Auth endpoints and RBAC
 - [Cycle Management API](./docs/CYCLE_MANAGEMENT_API.md) — Cycle endpoints and workflow
+- [Investor KYC Profile API](./docs/INVESTOR_KYC_API.md) — KYC endpoints and verification gate
+- [Field Agent Farmer Onboarding API](./docs/FIELD_AGENT_FARMER_ONBOARDING_API.md) — Farmer onboarding endpoints and audit logging
 - [Database Design & Workflow](./docs/AgriCapital_DB_Design_and_Workflow.md) — Schema design and validation rules
 - [Implementation Tasks](./docs/MVP_IMPLEMENTATION_TASKS.md) — Task tracking for MVP
 - [AGENTS.md](./AGENTS.md) — AI agent instructions and coding conventions
@@ -68,7 +70,14 @@ src/
 │   │   ├── cycles.service.js
 │   │   ├── cycles.controller.js
 │   │   └── cycles.routes.js
+│   ├── kyc/            # Investor KYC profile
+│   │   ├── kyc.service.js
+│   │   ├── kyc.controller.js
+│   │   ├── kyc.routes.js
+│   │   └── kyc.constants.js
 │   ├── investments/
+│   │   ├── investments.controller.js
+│   │   └── investments.routes.js
 │   ├── disbursements/
 │   ├── progressUpdates/
 │   ├── payouts/

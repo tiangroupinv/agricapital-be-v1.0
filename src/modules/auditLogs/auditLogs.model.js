@@ -45,7 +45,29 @@ const auditLogSchema = new Schema(
 // Indexes - for compliance lookups: "show me the history of this record"
 auditLogSchema.index({ entityType: 1, entityId: 1 });
 
-// Note: Add a pre('update') and pre('delete') hook to prevent modifications
-// This will be enforced at the service layer as well
+// Prevent modifications and deletions - audit logs are append-only
+auditLogSchema.pre("updateOne", function () {
+  throw new Error("Audit logs are immutable and cannot be updated");
+});
+
+auditLogSchema.pre("updateMany", function () {
+  throw new Error("Audit logs are immutable and cannot be updated");
+});
+
+auditLogSchema.pre("findOneAndUpdate", function () {
+  throw new Error("Audit logs are immutable and cannot be updated");
+});
+
+auditLogSchema.pre("deleteOne", function () {
+  throw new Error("Audit logs are immutable and cannot be deleted");
+});
+
+auditLogSchema.pre("deleteMany", function () {
+  throw new Error("Audit logs are immutable and cannot be deleted");
+});
+
+auditLogSchema.pre("findOneAndDelete", function () {
+  throw new Error("Audit logs are immutable and cannot be deleted");
+});
 
 module.exports = model("AuditLog", auditLogSchema);

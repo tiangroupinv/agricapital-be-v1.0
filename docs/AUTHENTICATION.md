@@ -52,6 +52,7 @@ Authorization: Bearer <token>
 | `farmer` | Smallholder receiving capital | View own cycles and disbursements |
 | `field_agent` | AgriCapital staff visiting farms | Create cycles, post progress updates |
 | `admin` | AgriCapital internal staff | Full access to all resources |
+| `off_taker` | Bulk buyer (hotel, school, factory, etc.) | **Record-only in MVP** — no login required; details embedded in `cycles` |
 
 ---
 
@@ -80,7 +81,7 @@ Register a new user account.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `role` | string | One of: `investor`, `farmer`, `field_agent`, `admin` |
+| `role` | string | One of: `investor`, `farmer`, `field_agent`, `admin`, `off_taker` (validated against `ROLES_LIST`; invalid roles return 400) |
 | `fullName` | string | User's full name |
 | `email` | string | Unique email address |
 | `phone` | string | Unique phone number with country code |
@@ -360,15 +361,17 @@ fetch('/api/users', {
 
 ### Role-Based Access
 
-| Endpoint | Investor | Farmer | Field Agent | Admin |
-|----------|----------|--------|-------------|-------|
-| `POST /api/auth/signup` | ✅ | ✅ | ✅ | ✅ |
-| `POST /api/auth/login` | ✅ | ✅ | ✅ | ✅ |
-| `GET /api/auth/me` | ✅ | ✅ | ✅ | ✅ |
-| `GET /api/users` | ❌ | ❌ | ❌ | ✅ |
-| `GET /api/users/:id` | Own only | Own only | Own only | ✅ |
-| `PATCH /api/users/:id` | Own only | Own only | Own only | ✅ |
-| `DELETE /api/users/:id` | ❌ | ❌ | ❌ | ✅ |
+Note: `off_taker` (bulk buyer) is **record-only in MVP** — no `users` document, no `/api/auth/signup` or `/api/auth/login` endpoint. Details are embedded inside `cycles.offTakerAgreement` per design doc §3.3.
+
+| Endpoint | Investor | Farmer | Field Agent | Admin | Off-Taker |
+|----------|----------|--------|-------------|-------|-----------|
+| `POST /api/auth/signup` | ✅ (validated: role ∈ ROLES_LIST) | ✅ (validated) | ✅ (validated) | ✅ (validated) | ❌ (record-only; no login) |
+| `POST /api/auth/login` | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `GET /api/auth/me` | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `GET /api/users` | ❌ | ❌ | ❌ | ✅ | ❌ |
+| `GET /api/users/:id` | Own only | Own only | Own only | ✅ | ❌ |
+| `PATCH /api/users/:id` | Own only | Own only (can update `farmerProfile`) | Own only | ✅ | ❌ |
+| `DELETE /api/users/:id` | ❌ | ❌ | ❌ | ✅ | ❌ |
 
 ---
 
@@ -405,6 +408,17 @@ fetch('/api/users', {
 {
   "status": "error",
   "message": "User not found"
+}
+```
+
+### 400 Bad Request (Invalid Role)
+
+Returned when the `role` field is not in the allowed list (`ROLES_LIST`):
+
+```json
+{
+  "status": "fail",
+  "message": "Invalid role: invalid_role. Valid roles: investor, farmer, field_agent, admin, off_taker"
 }
 ```
 
