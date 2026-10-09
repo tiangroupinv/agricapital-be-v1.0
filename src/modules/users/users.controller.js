@@ -1,6 +1,280 @@
 const User = require("./users.model");
+const { createFarmer, updateFarmer, getFarmerById, listFarmers } = require("./farmer.service");
 const ApiError = require("../../utils/apiError");
 const { ROLES } = require("../../constants");
+
+/**
+ * @swagger
+ * /api/farmers:
+ *   post:
+ *     summary: Create a new farmer profile
+ *     tags: [Farmers]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - fullName
+ *               - email
+ *               - phone
+ *               - password
+ *               - idDocumentNumber
+ *               - farmerProfile
+ *             properties:
+ *               fullName:
+ *                 type: string
+ *                 maxLength: 200
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               phone:
+ *                 type: string
+ *                 pattern: '^\+\d{12,15}$'
+ *               password:
+ *                 type: string
+ *                 minLength: 8
+ *               idDocumentNumber:
+ *                 type: string
+ *               farmerProfile:
+ *                 type: object
+ *                 required:
+ *                   - location
+ *                   - farmType
+ *                 properties:
+ *                   location:
+ *                     type: string
+ *                     maxLength: 200
+ *                   farmType:
+ *                     type: string
+ *                     enum: [crop, livestock]
+ *                   cooperativeName:
+ *                     type: string
+ *     responses:
+ *       201:
+ *         description: Farmer created successfully
+ *       400:
+ *         description: Invalid input data
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Not authorized (not field_agent or admin)
+ *       409:
+ *         description: Email or phone already exists
+ */
+
+/**
+ * @desc    Create a new farmer profile
+ * @route   POST /api/farmers
+ * @access  Private (Field Agent, Admin)
+ */
+async function createFarmerController(req, res, next) {
+  try {
+    const actorId = req.user._id;
+    const farmerData = req.body;
+
+    const farmer = await createFarmer(farmerData, actorId);
+
+    res.status(201).json({
+      status: "success",
+      data: farmer,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * @swagger
+ * /api/farmers/{id}:
+ *   get:
+ *     summary: Get farmer by ID
+ *     tags: [Farmers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Farmer user ID
+ *     responses:
+ *       200:
+ *         description: Farmer retrieved successfully
+ *       400:
+ *         description: Invalid ObjectId format or user is not a farmer
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Not authorized (not field_agent or admin)
+ *       404:
+ *         description: Farmer not found
+ */
+
+/**
+ * @desc    Get farmer by ID
+ * @route   GET /api/farmers/:id
+ * @access  Private (Field Agent, Admin)
+ */
+async function getFarmerController(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    const farmer = await getFarmerById(id);
+
+    res.status(200).json({
+      status: "success",
+      data: farmer,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * @swagger
+ * /api/farmers/{id}:
+ *   patch:
+ *     summary: Update farmer profile
+ *     tags: [Farmers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Farmer user ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               fullName:
+ *                 type: string
+ *                 maxLength: 200
+ *               phone:
+ *                 type: string
+ *                 pattern: '^\+\d{12,15}$'
+ *               idDocumentNumber:
+ *                 type: string
+ *               paymentDetails:
+ *                 type: object
+ *                 properties:
+ *                   momoNumber:
+ *                     type: string
+ *                   bankAccount:
+ *                     type: string
+ *               farmerProfile:
+ *                 type: object
+ *                 properties:
+ *                   location:
+ *                     type: string
+ *                     maxLength: 200
+ *                   farmType:
+ *                     type: string
+ *                     enum: [crop, livestock]
+ *                   cooperativeName:
+ *                     type: string
+ *     responses:
+ *       200:
+ *         description: Farmer updated successfully
+ *       400:
+ *         description: Invalid ObjectId format, user is not a farmer, or role update attempted
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Not authorized (not field_agent or admin)
+ *       404:
+ *         description: Farmer not found
+ *       409:
+ *         description: Phone number already exists
+ */
+
+/**
+ * @desc    Update farmer profile
+ * @route   PATCH /api/farmers/:id
+ * @access  Private (Field Agent, Admin)
+ */
+async function updateFarmerController(req, res, next) {
+  try {
+    const { id } = req.params;
+    const actorId = req.user._id;
+    const updateData = req.body;
+
+    const farmer = await updateFarmer(id, updateData, actorId);
+
+    res.status(200).json({
+      status: "success",
+      data: farmer,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * @swagger
+ * /api/farmers:
+ *   get:
+ *     summary: List all farmers with pagination
+ *     tags: [Farmers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 20
+ *         description: Items per page
+ *     responses:
+ *       200:
+ *         description: Paginated list of farmers
+ *       400:
+ *         description: Invalid pagination parameters
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Not authorized (not field_agent or admin)
+ */
+
+/**
+ * @desc    List all farmers with pagination
+ * @route   GET /api/farmers
+ * @access  Private (Field Agent, Admin)
+ */
+async function listFarmersController(req, res, next) {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+
+    const result = await listFarmers(page, limit);
+
+    res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
 
 /**
  * @desc    Get all users
@@ -198,4 +472,8 @@ module.exports = {
   updateUser,
   deactivateUser,
   reactivateUser,
+  createFarmerController,
+  getFarmerController,
+  updateFarmerController,
+  listFarmersController,
 };
