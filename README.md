@@ -35,6 +35,7 @@ npm test
 - [Authentication API](./docs/AUTHENTICATION.md) — Auth endpoints and RBAC
 - [Cycle Management API](./docs/CYCLE_MANAGEMENT_API.md) — Cycle endpoints and workflow
 - [Investor KYC Profile API](./docs/INVESTOR_KYC_API.md) — KYC endpoints and verification gate
+- [Investment API](./docs/INVESTMENT_API.md) — Investment endpoints and workflow
 - [Field Agent Farmer Onboarding API](./docs/FIELD_AGENT_FARMER_ONBOARDING_API.md) — Farmer onboarding endpoints and audit logging
 - [Database Design & Workflow](./docs/AgriCapital_DB_Design_and_Workflow.md) — Schema design and validation rules
 - [Implementation Tasks](./docs/MVP_IMPLEMENTATION_TASKS.md) — Task tracking for MVP
