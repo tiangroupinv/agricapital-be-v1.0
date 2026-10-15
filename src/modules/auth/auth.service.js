@@ -2,7 +2,7 @@ const User = require("../users/users.model");
 const { hashPassword, comparePassword } = require("../../utils/hash");
 const { signToken } = require("../../utils/jwt");
 const ApiError = require("../../utils/apiError");
-const { ROLES } = require("../../constants");
+const { ROLES, ROLES_LIST } = require("../../constants");
 
 // Required fields for signup
 const REQUIRED_FIELDS = ["role", "fullName", "email", "phone", "password", "idDocumentNumber"];
@@ -27,6 +27,11 @@ function validateRequiredFields(data) {
 async function signup(userData) {
   // Validate required fields
   validateRequiredFields(userData);
+
+  // Validate role
+  if (!ROLES_LIST.includes(userData.role)) {
+    throw new ApiError(400, `Invalid role: ${userData.role}. Valid roles: ${ROLES_LIST.join(", ")}`);
+  }
 
   const { role, fullName, email, phone, password, idDocumentNumber, farmerProfile } = userData;
 

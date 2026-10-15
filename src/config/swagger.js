@@ -328,6 +328,144 @@ const options = {
             },
           },
         },
+        // Investment schemas
+        InvestmentStatus: {
+          type: "string",
+          enum: ["pending", "confirmed", "failed", "refunded"],
+        },
+        PaymentMethod: {
+          type: "string",
+          enum: ["momo", "airtel_money", "bank_transfer"],
+        },
+        Investment: {
+          type: "object",
+          properties: {
+            _id: {
+              type: "string",
+            },
+            investorId: {
+              type: "string",
+              description: "Reference to investor (User)",
+            },
+            cycleId: {
+              type: "string",
+              description: "Reference to cycle",
+            },
+            amount: {
+              type: "number",
+              example: 500000,
+              description: "Investment amount in RWF",
+            },
+            paymentMethod: {
+              $ref: "#/components/schemas/PaymentMethod",
+            },
+            transactionReference: {
+              type: "string",
+              example: "MTN-123456789",
+            },
+            status: {
+              $ref: "#/components/schemas/InvestmentStatus",
+            },
+            confirmedAt: {
+              type: "string",
+              format: "date-time",
+              nullable: true,
+            },
+            createdAt: {
+              type: "string",
+              format: "date-time",
+            },
+            updatedAt: {
+              type: "string",
+              format: "date-time",
+            },
+          },
+        },
+        InvestmentInput: {
+          type: "object",
+          required: ["cycleId", "amount", "paymentMethod", "transactionReference"],
+          properties: {
+            cycleId: {
+              type: "string",
+              pattern: "^[0-9a-fA-F]{24}$",
+              description: "Cycle ObjectId",
+            },
+            amount: {
+              type: "number",
+              minimum: 1,
+              description: "Investment amount in RWF",
+            },
+            paymentMethod: {
+              $ref: "#/components/schemas/PaymentMethod",
+            },
+            transactionReference: {
+              type: "string",
+              description: "Transaction reference from payment provider",
+            },
+          },
+        },
+      },
+      responses: {
+        BadRequest: {
+          description: "Bad Request",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/Error",
+              },
+            },
+          },
+        },
+        Unauthorized: {
+          description: "Unauthorized",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/Error",
+              },
+            },
+          },
+        },
+        Forbidden: {
+          description: "Forbidden",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/Error",
+              },
+            },
+          },
+        },
+        NotFound: {
+          description: "Not Found",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/Error",
+              },
+            },
+          },
+        },
+        UnprocessableEntity: {
+          description: "Unprocessable Entity",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/Error",
+              },
+            },
+          },
+        },
+        Conflict: {
+          description: "Conflict",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/Error",
+              },
+            },
+          },
+        },
       },
     },
     tags: [
@@ -343,12 +481,17 @@ const options = {
         name: "Cycles",
         description: "Cycle management endpoints",
       },
+      {
+        name: "Investments",
+        description: "Investment management endpoints",
+      },
     ],
   },
   apis: [
     "./src/modules/auth/auth.routes.js",
     "./src/modules/users/users.routes.js",
     "./src/modules/cycles/cycles.routes.js",
+    "./src/modules/investments/investments.routes.js",
   ],
 };
 

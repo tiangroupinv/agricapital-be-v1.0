@@ -50,5 +50,7 @@ const investmentSchema = new Schema(
 // Indexes
 investmentSchema.index({ cycleId: 1 });
 investmentSchema.index({ investorId: 1 });
+// Compound unique index to prevent duplicate investments per investor per cycle
+investmentSchema.index({ investorId: 1, cycleId: 1 }, { unique: true });
 
 module.exports = model("Investment", investmentSchema);

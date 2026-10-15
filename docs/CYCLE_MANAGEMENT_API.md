@@ -189,9 +189,111 @@ List all cycles with filtering and pagination.
 
 **GET** `/api/cycles/:id`
 
-Get a single cycle by ID.
+Get a single cycle by ID. Response shape varies by viewer role.
 
 **Access:** All authenticated users
+
+**Role-Based Response:**
+
+| Role | Response Type | Status Visibility |
+|------|---------------|-------------------|
+| Investor | Investor Detail View | `funding`, `funded`, `in_progress`, `completed`, `closed` only |
+| Farmer | Full Document | All statuses |
+| Field Agent | Full Document | All statuses |
+| Admin | Full Document | All statuses |
+
+**Investor Visibility:** Investors receive a 404 for cycles in `draft`, `under_review`, `approved`, or `cancelled` status. This prevents leaking internal cycle existence.
+
+---
+
+#### Investor Detail Response
+
+When an investor accesses a cycle in an investor-visible status, the response is optimized for the investor cycle detail page:
+
+**Response (200 OK):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "_id": "6789abcdef...",
+    "type": "livestock",
+    "purpose": "feeds",
+    "status": "funding",
+    "location": "Musanze District",
+    "targetAmount": 2000000,
+    "fundedAmount": 500000,
+    "fundingProgress": {
+      "fundedAmount": 500000,
+      "targetAmount": 2000000,
+      "percent": 25,
+      "investorCount": 2,
+      "isFullyFunded": false
+    },
+    "farmer": {
+      "fullName": "Alice Mukamana",
+      "farmLocation": "Musanze District",
+      "farmType": "livestock",
+      "cooperativeName": "Musanze Dairy Cooperative"
+    },
+    "offTakerAgreement": {
+      "buyerName": "Kigali Serena Hotel",
+      "buyerType": "hotel",
+      "product": "Fresh milk",
+      "pricePerUnit": 400,
+      "quantity": 5000,
+      "contractReference": "AGR-OT-2026-014"
+    },
+    "insurance": {
+      "naisCovered": true,
+      "insurerName": "SORAS Insurance",
+      "coverageStartDate": "2026-11-01",
+      "coverageEndDate": "2027-02-01",
+      "activeClaims": 0
+    },
+    "expectedReturns": {
+      "proceedsAmount": 2000000,
+      "proceedsSource": "off_taker_estimate",
+      "platformFeeRate": { "min": 0.10, "max": 0.15 },
+      "brokerageFeeRate": { "min": 0.03, "max": 0.05 },
+      "netReturnRange": { "min": 1640000, "max": 1740000 }
+    },
+    "timeline": [
+      { "date": "2026-09-01", "type": "cycle_created", "description": "Cycle created" },
+      { "date": "2026-09-05", "type": "approved", "description": "Cycle approved by platform" },
+      { "date": "2026-09-15", "type": "progress_update", "description": "Health check completed", "updateType": "health_check" }
+    ],
+    "expectedStartDate": "2026-11-01",
+    "expectedEndDate": "2027-02-01",
+    "createdAt": "2026-09-01T10:30:00.000Z"
+  }
+}
+```
+
+**Investor Detail Fields:**
+
+| Field | Description |
+|-------|-------------|
+| `fundingProgress` | Calibrated from confirmed investments only; `percent` (0–100), `investorCount`, `isFullyFunded` |
+| `farmer` | Summary only — `fullName`, `farmLocation`, `farmType`, `cooperativeName` (no PII) |
+| `offTakerAgreement` | Buyer details — `buyerName`, `buyerType`, `product`, `pricePerUnit`, `quantity`, `contractReference` (no `contractDocumentUrl`) |
+| `insurance` | Coverage status — `naisCovered`, `insurerName`, coverage dates, `activeClaims` count (no claim details or `policyReference`) |
+| `expectedReturns` | Fee-adjusted return range using platform (10–15%) and brokerage (3–5%) rates |
+| `timeline` | Merged cycle dates + progress updates, sorted ascending |
+
+**Excluded from Investor View:**
+
+- Farmer `email`, `phone`, `idDocumentNumber`, `kycStatus`, `paymentDetails`
+- `fieldAgentIds` (internal assignment)
+- `insurance.claims`, `insurance.policyReference`
+- `offTakerAgreement.contractDocumentUrl`
+- `cancellationReason`
+
+---
+
+#### Full Document Response (Non-Investor)
+
+For farmer, field agent, and admin roles, the full cycle document is returned:
 
 **Response (200 OK):**
 
@@ -204,7 +306,8 @@ Get a single cycle by ID.
       "_id": "6789abcdef...",
       "fullName": "Farmer Joe",
       "email": "farmer@example.com",
-      "farmerProfile": { "location": "Musanze" }
+      "phone": "+250788000000",
+      "farmerProfile": { "location": "Musanze", "farmType": "crop" }
     },
     "fieldAgentIds": [{ "_id": "...", "fullName": "Agent Smith" }],
     "type": "crop",
@@ -216,6 +319,24 @@ Get a single cycle by ID.
     "offTakerAgreement": { ... },
     "insurance": { ... }
   }
+}
+```
+
+---
+
+#### Error Responses
+
+```json
+// 404 Not Found (Investor accessing non-visible status)
+{
+  "status": "error",
+  "message": "Cycle not found"
+}
+
+// 404 Not Found (Invalid ID)
+{
+  "status": "error",
+  "message": "Cycle not found"
 }
 ```
 

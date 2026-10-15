@@ -5,12 +5,21 @@ let mongoServer;
 
 /**
  * Connect to in-memory MongoDB for testing
+ * Uses replica set to support transactions
  */
 async function connectTestDB() {
-  mongoServer = await MongoMemoryServer.create();
+  mongoServer = await MongoMemoryServer.create({
+    replSet: { count: 1, name: "rs0" },
+  });
   const mongoUri = mongoServer.getUri();
 
-  await mongoose.connect(mongoUri);
+  await mongoose.connect(mongoUri, {
+    retryWrites: false,
+    writeConcern: { w: "majority" },
+    readConcern: { level: "majority" },
+    maxPoolSize: 5,
+    minPoolSize: 1,
+  });
 }
 
 /**
